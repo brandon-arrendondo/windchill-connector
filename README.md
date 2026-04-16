@@ -117,7 +117,7 @@ windchill-upload \
   --auth-token "$(echo -n 'user:pass' | base64)" \
   --checkout-comment "CI upload" \
   --filepath ./artifact.zip \
-  --version "1.2.3" \
+  --version-id "1.2.3" \
   --release-notes-path ./RELEASE_NOTES.md
 ```
 
@@ -130,7 +130,7 @@ windchill-upload \
   --auth-token "$(echo -n 'user:pass' | base64)" \
   --checkout-comment "CI upload" \
   --filepath ./artifact.zip \
-  --version "1.2.3" \
+  --version-id "1.2.3" \
   --release-notes-path ./RELEASE_NOTES.md
 ```
 
@@ -148,7 +148,7 @@ Example GitHub Actions step:
       --auth-token "$WINDCHILL_AUTH" \
       --checkout-comment "Release ${{ github.ref_name }}" \
       --filepath ./dist/product.zip \
-      --version "${{ github.ref_name }}" \
+      --version-id "${{ github.ref_name }}" \
       --release-notes-path ./RELEASE_NOTES.md
 ```
 

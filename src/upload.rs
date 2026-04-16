@@ -37,9 +37,11 @@ struct Cli {
     #[arg(long)]
     filepath: PathBuf,
 
-    /// Version identifier (passed to the BISSELL-specific `UpdateDocument` action)
+    /// Version identifier (passed as `versionId` to the BISSELL-specific
+    /// `UpdateDocument` action). Named `--version-id` rather than `--version`
+    /// to avoid shadowing clap's built-in `--version` flag.
     #[arg(long)]
-    version: String,
+    version_id: String,
 
     /// Path to release notes file (contents are used as the check-in comment)
     #[arg(long)]
@@ -169,7 +171,7 @@ async fn main() -> anyhow::Result<()> {
         &client,
         &updated_oid,
         &cli.filepath,
-        &cli.version,
+        &cli.version_id,
         &release_notes,
     )
     .await
@@ -223,7 +225,7 @@ async fn upload_file_with_retry(
     client: &WindchillClient,
     oid: &str,
     filepath: &Path,
-    version: &str,
+    version_id: &str,
     release_notes: &str,
 ) -> anyhow::Result<()> {
     let backoff = ExponentialBackoff {
@@ -234,7 +236,7 @@ async fn upload_file_with_retry(
 
     let oid = oid.to_string();
     let filepath = filepath.to_path_buf();
-    let version = version.to_string();
+    let version_id = version_id.to_string();
     let release_notes = release_notes.to_string();
 
     retry(backoff, || async {
@@ -254,7 +256,7 @@ async fn upload_file_with_retry(
             &nonce,
             &oid,
             &filepath,
-            &version,
+            &version_id,
             &release_notes,
         ) {
             Ok((_, details)) => match serde_json::from_str::<serde_json::Value>(&details) {
