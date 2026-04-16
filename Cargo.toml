@@ -1,0 +1,61 @@
+[package]
+name = "windchill-connector"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rust CLI and headless uploader for PTC Windchill PLM operations"
+repository = "https://github.com/brandon-arrendondo/windchill-connector"
+authors = ["Brandon Arrendondo <brandon@arrendondo.dev>"]
+readme = "README.md"
+keywords = ["windchill", "plm", "ptc", "cli", "odata"]
+categories = ["command-line-utilities"]
+
+[lib]
+name = "windchill_connector"
+path = "src/lib.rs"
+
+[[bin]]
+name = "windchill"
+path = "src/main.rs"
+
+[[bin]]
+name = "windchill-upload"
+path = "src/upload.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+rpassword = "7.3"
+indicatif = "0.17"
+console = "0.15"
+
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "multipart", "json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+config = "0.14"
+toml = "0.8"
+dirs = "5.0"
+
+base64 = "0.22"
+sha2 = "0.10"
+anyhow = "1.0"
+thiserror = "1.0"
+backoff = { version = "0.4", features = ["tokio"] }
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+env_logger = "0.11"
+whoami = "1.5"
+
+[package.metadata.deb]
+maintainer = "Brandon Arrendondo <brandon@arrendondo.dev>"
+copyright = "2026, Brandon Arrendondo <brandon@arrendondo.dev>"
+license-file = ["LICENSE", "0"]
+extended-description = "CLI and headless uploader for PTC Windchill PLM operations."
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/windchill", "usr/bin/", "755"],
+    ["target/release/windchill-upload", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/windchill-connector/README", "644"],
+]
