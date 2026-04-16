@@ -2051,7 +2051,7 @@ dependencies = [
 
 [[package]]
 name = "windchill-connector"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "backoff",

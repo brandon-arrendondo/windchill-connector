@@ -27,9 +27,10 @@ Ships two binaries:
 
 Each tagged release publishes:
 
-- `windchill-connector-linux-x86_64.tar.gz`
-- `windchill-connector-windows-x86_64.zip`
-- `windchill-connector-x86_64.AppImage` (Linux)
+- `windchill-connector-linux-x86_64.tar.gz` — both binaries
+- `windchill-connector-windows-x86_64.zip` — both binaries
+- `windchill-x86_64.AppImage` (Linux) — interactive CLI
+- `windchill-upload-x86_64.AppImage` (Linux) — headless uploader
 - `*.deb` (Debian / Ubuntu)
 
 Grab the latest from the [Releases page](https://github.com/brandon-arrendondo/windchill-connector/releases).

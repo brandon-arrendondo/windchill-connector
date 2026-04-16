@@ -93,9 +93,17 @@ jobs:
           path: target/debian/*.deb
 
   # ── AppImage (Linux) ────────────────────────────────────────────────
+  # One AppImage per binary. `windchill` and `windchill-upload` are distinct
+  # CLIs with different argument surfaces, and an AppImage's entrypoint is
+  # determined by its single `.desktop` file's `Exec=`. Bundling both into a
+  # single AppDir is not a way to ship both tools — the non-Exec binary ends
+  # up unreachable via the AppImage entrypoint.
   appimage:
-    name: AppImage
+    name: AppImage (${{ matrix.binary }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        binary: [windchill, windchill-upload]
     steps:
       - uses: actions/checkout@v4
 
@@ -114,35 +122,41 @@ jobs:
       - name: Create AppDir
         run: |
           mkdir -p AppDir/usr/bin
-          cp target/release/windchill AppDir/usr/bin/
-          cp target/release/windchill-upload AppDir/usr/bin/
+          cp target/release/${{ matrix.binary }} AppDir/usr/bin/
 
       - name: Create desktop entry and icon
+        env:
+          BIN: ${{ matrix.binary }}
         run: |
           mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
-          cat > AppDir/usr/share/applications/windchill.desktop << 'DESKTOP'
+          cat > "AppDir/usr/share/applications/${BIN}.desktop" <<DESKTOP
           [Desktop Entry]
           Type=Application
-          Name=windchill
-          Exec=windchill
-          Icon=windchill
+          Name=${BIN}
+          Exec=${BIN}
+          Icon=${BIN}
           Categories=Development;
           Terminal=true
           NoDisplay=true
           DESKTOP
           # Minimal 1x1 PNG as placeholder icon
-          printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > AppDir/usr/share/icons/hicolor/256x256/apps/windchill.png
+          printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > "AppDir/usr/share/icons/hicolor/256x256/apps/${BIN}.png"
 
       - name: Build AppImage
+        env:
+          OUTPUT: ${{ matrix.binary }}-x86_64.AppImage
+          ARCH: x86_64
+        run: ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+
+      - name: Smoke-test AppImage entrypoint
         run: |
-          ARCH=x86_64 ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          mv windchill-*.AppImage windchill-connector-x86_64.AppImage 2>/dev/null || \
-            mv Windchill-*.AppImage windchill-connector-x86_64.AppImage 2>/dev/null || true
+          chmod +x ${{ matrix.binary }}-x86_64.AppImage
+          ./${{ matrix.binary }}-x86_64.AppImage --version
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windchill-connector-appimage
-          path: windchill-connector-x86_64.AppImage
+          name: ${{ matrix.binary }}-appimage
+          path: ${{ matrix.binary }}-x86_64.AppImage
 
   # ── GitHub Release ──────────────────────────────────────────────────
   release:
@@ -165,4 +179,5 @@ jobs:
             artifacts/windchill-connector-linux-x86_64/windchill-connector-linux-x86_64.tar.gz
             artifacts/windchill-connector-windows-x86_64/windchill-connector-windows-x86_64.zip
             artifacts/windchill-connector-deb/*.deb
-            artifacts/windchill-connector-appimage/windchill-connector-x86_64.AppImage
+            artifacts/windchill-appimage/windchill-x86_64.AppImage
+            artifacts/windchill-upload-appimage/windchill-upload-x86_64.AppImage
