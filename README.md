@@ -174,7 +174,7 @@ If you are adapting `windchill-connector` to a different Windchill site,
 replace the `UpdateDocument` call inside
 [`src/operations.rs::attach_primary_content_to_document`](src/operations.rs)
 with a standard `PTC.DocMgmt.CheckIn` action (the `check_in_document` helper
-in the same file already does this for you) and drop the `--version` flag
+in the same file already does this for you) and drop the `--version-id` flag
 from the CLI, or wire it into your own custom action.
 
 Everything else in this crate is vendor-neutral.
