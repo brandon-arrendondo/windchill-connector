@@ -3,7 +3,6 @@
 use backoff::{future::retry, Error as BackoffError, ExponentialBackoff};
 use clap::Parser;
 use console::style;
-use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use windchill_connector::{operations, Config, WindchillClient};
@@ -128,42 +127,22 @@ async fn main() -> anyhow::Result<()> {
         oid
     };
 
-    let nonce = get_nonce_with_retry(&client).await?;
-    log::info!("Acquired nonce");
-
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap(),
-    );
-    pb.enable_steady_tick(Duration::from_millis(100));
-    pb.set_message("Checking out document...");
-
-    let checkout_result =
-        operations::check_out_document(&client, &nonce, &doc_oid, &cli.checkout_comment)?;
-
-    let updated_oid = checkout_result["ID"]
-        .as_str()
-        .ok_or_else(|| anyhow::anyhow!("Failed to get updated OID from checkout response"))?
-        .to_string();
-
-    if updated_oid == doc_oid {
-        pb.finish_with_message(
-            style("Error: Document is already checked out")
-                .red()
-                .to_string(),
-        );
-        eprintln!("{}", style("Document is already checked out").red());
-        std::process::exit(1);
-    }
-
-    pb.finish_with_message(
-        style("Document checked out successfully")
-            .green()
-            .to_string(),
-    );
-    log::info!("Document checked out, new OID: {}", updated_oid);
+    println!("{}", style("Checking out document...").yellow());
+    let updated_oid =
+        match checkout_document_with_retry(&client, &doc_oid, &cli.checkout_comment).await {
+            Ok(oid) => {
+                println!("{}", style("Document checked out successfully").green());
+                log::info!("Document checked out, new OID: {}", oid);
+                oid
+            }
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    style(format!("Failed to check out document: {}", e)).red()
+                );
+                std::process::exit(1);
+            }
+        };
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -199,6 +178,65 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(1);
         }
     }
+}
+
+async fn checkout_document_with_retry(
+    client: &WindchillClient,
+    doc_oid: &str,
+    checkout_comment: &str,
+) -> anyhow::Result<String> {
+    let backoff = ExponentialBackoff {
+        max_elapsed_time: Some(Duration::from_secs(120)),
+        initial_interval: Duration::from_secs(5),
+        max_interval: Duration::from_secs(30),
+        ..Default::default()
+    };
+
+    let doc_oid = doc_oid.to_string();
+    let checkout_comment = checkout_comment.to_string();
+
+    retry(backoff, || async {
+        let nonce = match client.get_nonce() {
+            Ok(n) => n,
+            Err(e) => {
+                log::warn!("Failed to get nonce for checkout, retrying: {}", e);
+                return Err(BackoffError::transient(anyhow::anyhow!(
+                    "Nonce error: {}",
+                    e
+                )));
+            }
+        };
+
+        match operations::check_out_document(client, &nonce, &doc_oid, &checkout_comment) {
+            Ok(result) => {
+                let updated_oid = match result["ID"].as_str() {
+                    Some(oid) => oid.to_string(),
+                    None => {
+                        return Err(BackoffError::transient(anyhow::anyhow!(
+                            "No ID field in checkout response"
+                        )));
+                    }
+                };
+
+                if updated_oid == doc_oid {
+                    log::warn!("Document is checked out by another user, will retry...");
+                    return Err(BackoffError::transient(anyhow::anyhow!(
+                        "Document already checked out"
+                    )));
+                }
+
+                Ok(updated_oid)
+            }
+            Err(e) => {
+                log::warn!("Checkout failed, retrying: {}", e);
+                Err(BackoffError::transient(anyhow::anyhow!(
+                    "Checkout error: {}",
+                    e
+                )))
+            }
+        }
+    })
+    .await
 }
 
 async fn get_nonce_with_retry(client: &WindchillClient) -> anyhow::Result<String> {
