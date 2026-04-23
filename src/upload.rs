@@ -96,10 +96,32 @@ async fn main() -> anyhow::Result<()> {
 
     let client = WindchillClient::new(config.base_url.clone(), cli.auth_token.clone())?;
 
-    let release_notes = std::fs::read_to_string(&cli.release_notes_path)?;
+    let release_notes_raw = std::fs::read_to_string(&cli.release_notes_path)?;
     println!("{}", style("Release Notes:").bold());
-    println!("{}", release_notes);
+    println!("{}", release_notes_raw);
     println!();
+
+    // Windchill rejects CheckinComment values over 4000 characters.
+    // Truncate to 3800 to leave room for the suffix.
+    const WINDCHILL_COMMENT_LIMIT: usize = 3800;
+    let release_notes = if release_notes_raw.chars().count() > WINDCHILL_COMMENT_LIMIT {
+        let notes_filename = cli.release_notes_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("release_notes.txt");
+        log::warn!(
+            "Release notes ({} chars) exceed {} chars; truncating for Windchill checkin comment",
+            release_notes_raw.chars().count(),
+            WINDCHILL_COMMENT_LIMIT
+        );
+        let truncated: String = release_notes_raw.chars().take(WINDCHILL_COMMENT_LIMIT).collect();
+        format!(
+            "{}\n\n...(truncated at {} chars — full notes in attached zip as {})\n",
+            truncated, WINDCHILL_COMMENT_LIMIT, notes_filename
+        )
+    } else {
+        release_notes_raw
+    };
 
     tokio::time::sleep(Duration::from_millis(2500)).await;
 
@@ -146,12 +168,24 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
+    let file_bytes = std::fs::metadata(&cli.filepath)?.len();
+    // Assume a floor of 500 KB/s to Windchill; minimum 5 minutes.
+    let upload_timeout = Duration::from_secs(
+        ((file_bytes / 500_000) + 1).max(300)
+    );
+    log::info!(
+        "File size: {:.1} MB — upload timeout: {}s",
+        file_bytes as f64 / 1_048_576.0,
+        upload_timeout.as_secs()
+    );
+
     match upload_file_with_retry(
         &client,
         &updated_oid,
         &cli.filepath,
         &cli.version_id,
         &release_notes,
+        upload_timeout,
     )
     .await
     {
@@ -265,10 +299,12 @@ async fn upload_file_with_retry(
     filepath: &Path,
     version_id: &str,
     release_notes: &str,
+    upload_timeout: Duration,
 ) -> anyhow::Result<()> {
+    // Allow up to 3 full upload attempts before giving up.
     let backoff = ExponentialBackoff {
-        max_elapsed_time: Some(Duration::from_secs(60)),
-        max_interval: Duration::from_secs(10),
+        max_elapsed_time: Some(upload_timeout * 3),
+        max_interval: Duration::from_secs(30),
         ..Default::default()
     };
 
@@ -296,6 +332,7 @@ async fn upload_file_with_retry(
             &filepath,
             &version_id,
             &release_notes,
+            upload_timeout,
         ) {
             Ok((_, details)) => match serde_json::from_str::<serde_json::Value>(&details) {
                 Ok(json) => {

@@ -121,6 +121,7 @@ pub fn attach_primary_content_to_document(
     file_path: &Path,
     version: &str,
     checkin_comment: &str,
+    upload_timeout: std::time::Duration,
 ) -> Result<(String, String)> {
     let pb = ProgressBar::new(2);
     pb.set_style(
@@ -137,7 +138,7 @@ pub fn attach_primary_content_to_document(
         document_oid
     );
 
-    let upload_response = client.put_file(&upload_path, file_path, nonce)?;
+    let upload_response = client.put_file(&upload_path, file_path, nonce, upload_timeout)?;
     let upload_result = upload_response.text()?;
 
     pb.inc(1);

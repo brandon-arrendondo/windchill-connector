@@ -213,6 +213,7 @@ fn main() -> anyhow::Result<()> {
                 filepath,
                 version,
                 "File attached",
+                std::time::Duration::from_secs(600),
             )?;
 
             let json: serde_json::Value = serde_json::from_str(&details)?;

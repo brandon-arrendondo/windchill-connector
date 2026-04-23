@@ -77,6 +77,7 @@ impl WindchillClient {
         path: &str,
         file_path: &std::path::Path,
         nonce: &str,
+        timeout: std::time::Duration,
     ) -> Result<Response> {
         let url = format!("{}{}", self.base_url, path);
         let mut headers = self.default_headers();
@@ -89,6 +90,7 @@ impl WindchillClient {
             .put(&url)
             .headers(headers)
             .multipart(form)
+            .timeout(timeout)
             .send()?;
 
         if response.status().as_u16() == 401 || response.status().as_u16() == 403 {
