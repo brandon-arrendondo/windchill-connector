@@ -105,7 +105,8 @@ async fn main() -> anyhow::Result<()> {
     // Truncate to 3800 to leave room for the suffix.
     const WINDCHILL_COMMENT_LIMIT: usize = 3800;
     let release_notes = if release_notes_raw.chars().count() > WINDCHILL_COMMENT_LIMIT {
-        let notes_filename = cli.release_notes_path
+        let notes_filename = cli
+            .release_notes_path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("release_notes.txt");
@@ -114,7 +115,10 @@ async fn main() -> anyhow::Result<()> {
             release_notes_raw.chars().count(),
             WINDCHILL_COMMENT_LIMIT
         );
-        let truncated: String = release_notes_raw.chars().take(WINDCHILL_COMMENT_LIMIT).collect();
+        let truncated: String = release_notes_raw
+            .chars()
+            .take(WINDCHILL_COMMENT_LIMIT)
+            .collect();
         format!(
             "{}\n\n...(truncated at {} chars — full notes in attached zip as {})\n",
             truncated, WINDCHILL_COMMENT_LIMIT, notes_filename
@@ -170,9 +174,7 @@ async fn main() -> anyhow::Result<()> {
 
     let file_bytes = std::fs::metadata(&cli.filepath)?.len();
     // Assume a floor of 500 KB/s to Windchill; minimum 5 minutes.
-    let upload_timeout = Duration::from_secs(
-        ((file_bytes / 500_000) + 1).max(300)
-    );
+    let upload_timeout = Duration::from_secs(((file_bytes / 500_000) + 1).max(300));
     log::info!(
         "File size: {:.1} MB — upload timeout: {}s",
         file_bytes as f64 / 1_048_576.0,
